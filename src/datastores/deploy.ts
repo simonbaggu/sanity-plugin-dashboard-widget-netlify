@@ -96,6 +96,8 @@ function tryCorsProxy(
 
         return {
           ...deployItem,
+          // Map Netlify API field names to our interface
+          siteId: (deployItem as any).site_id || deployItem.siteId,
           buildTime,
         }
       })
@@ -148,6 +150,8 @@ export function fetchDeployHistory(
 
           return {
             ...deployItem,
+            // Map Netlify API field names to our interface
+            siteId: (deployItem as any).site_id || deployItem.siteId,
             buildTime,
           }
         })

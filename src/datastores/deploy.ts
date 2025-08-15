@@ -38,7 +38,9 @@ export function fetchDeployHistory(
     ? `${proxyUrl}/sites/${siteId}/deploys`
     : `https://api.netlify.com/api/v1/sites/${siteId}/deploys`
 
-  const headers: Record<string, string> = {}
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`
   }

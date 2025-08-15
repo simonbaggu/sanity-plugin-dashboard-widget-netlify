@@ -13,6 +13,7 @@ interface Action {
   deployments?: Deployment[]
   siteId?: string
   deploys?: Deploy[]
+  errorMessage?: string
 }
 
 interface State {
@@ -86,6 +87,10 @@ export const stateReducer$ = scan((state: State = initialState, action: Action):
       return {
         ...state,
         isRefreshing: false,
+        deployHistory: {
+          ...state.deployHistory,
+          [action.siteId!]: [], // Set empty array for failed sites
+        },
       }
 
     default:

@@ -26,7 +26,10 @@ const createDeployHistoryStream = (
 ) => {
   return fetchDeployHistory(site.id, accessToken, proxyUrl, maxDeploys).pipe(
     map((deploys) => ({type: actionType, siteId: site.id, deploys})),
-    catchError(() => of({type: 'deployHistory/failed', siteId: site.id}))
+    catchError((error) => {
+      console.error(`Failed to fetch deploys for site ${site.id}:`, error)
+      return of({type: 'deployHistory/failed', siteId: site.id, error: error.message})
+    })
   )
 }
 

@@ -1,22 +1,29 @@
 import {merge, of, timer} from 'rxjs'
 import {createEventHandler} from 'react-props-stream'
-import {catchError, map, startWith, switchMap} from 'rxjs/operators'
+import {
+  catchError,
+  map,
+  startWith,
+  switchMap,
+  debounceTime,
+  distinctUntilChanged,
+} from 'rxjs/operators'
 import {deploy, fetchDeployHistory} from './datastores/deploy'
-import {Site, WidgetOptions} from './types'
 import {stateReducer$} from './reducers'
+import {WidgetOptions, Site, NetlifyWidgetProps} from './types'
 
-const noop = () => undefined
-
-const INITIAL_PROPS = {
-  title: 'Netlify sites',
+const INITIAL_PROPS: NetlifyWidgetProps = {
+  title: 'Netlify Deployments',
+  description: 'Deploy your sites to Netlify',
   sites: [],
   isLoading: true,
-  onDeploy: noop,
+  onDeploy: () => {
+    // Empty function for initial state
+  },
   deployHistory: {},
   isRefreshing: false,
 }
 
-// Helper function to create deploy history stream for a site
 const createDeployHistoryStream = (
   site: Site,
   actionType: string,
@@ -33,7 +40,6 @@ const createDeployHistoryStream = (
   )
 }
 
-// Helper function to create deploy history streams for all sites
 const createDeployHistoryStreams = (
   sites: Site[],
   actionType: string,
@@ -82,8 +88,8 @@ export const props$ = (options: WidgetOptions) => {
     )
   )
 
-  // Auto-refresh functionality
-  const refreshDeployHistory$ = timer(0, pollIntervalMs).pipe(
+  // Initial load - only run once
+  const initialLoad$ = timer(1000).pipe(
     switchMap(() =>
       of(configuredSites).pipe(
         switchMap((sites) =>
@@ -99,8 +105,25 @@ export const props$ = (options: WidgetOptions) => {
     )
   )
 
-  // Fast refresh when deploy is in progress
-  const fastRefresh$ = timer(0, fastPollIntervalMs).pipe(
+  // Auto-refresh functionality - start after pollIntervalMs
+  const refreshDeployHistory$ = timer(pollIntervalMs, pollIntervalMs).pipe(
+    switchMap(() =>
+      of(configuredSites).pipe(
+        switchMap((sites) =>
+          createDeployHistoryStreams(
+            sites,
+            'deployHistory/updated',
+            accessToken,
+            proxyUrl,
+            maxDeploys
+          )
+        )
+      )
+    )
+  )
+
+  // Fast refresh when deploy is in progress - start after fastPollIntervalMs
+  const fastRefresh$ = timer(fastPollIntervalMs, fastPollIntervalMs).pipe(
     switchMap(() =>
       of(configuredSites).pipe(
         switchMap((sites) =>
@@ -120,11 +143,16 @@ export const props$ = (options: WidgetOptions) => {
     setSitesAction$,
     deployAction$,
     deployCompletedAction$,
+    initialLoad$,
     refreshDeployHistory$,
     fastRefresh$
   ).pipe(stateReducer$)
 
   return state$.pipe(
+    debounceTime(100), // Prevent rapid state changes
+    distinctUntilChanged(
+      (prev, curr) => JSON.stringify(prev.deployHistory) === JSON.stringify(curr.deployHistory)
+    ),
     map((state) => ({
       sites: state.sites,
       title: options.title || INITIAL_PROPS.title,

@@ -56,19 +56,50 @@ function tryCorsProxy(
     headers.Authorization = `Bearer ${accessToken}`
   }
 
+  // console.log(`Trying CORS proxy ${proxyIndex + 1}: ${corsProxy}`)
+
   return jsonRequest<Deploy[]>(url, {
     method: 'GET',
     headers,
   }).pipe(
-    map((deploys) =>
-      deploys.slice(0, 10).map((deployItem) => ({
-        ...deployItem,
-        buildTime:
-          deployItem.publishedAt && deployItem.createdAt
-            ? new Date(deployItem.publishedAt).getTime() - new Date(deployItem.createdAt).getTime()
-            : undefined,
-      }))
-    ),
+    map((deploys) => {
+      // console.log('Raw response from CORS proxy:', deploys)
+
+      // Handle different response formats from CORS proxies
+      if (!Array.isArray(deploys)) {
+        // console.warn('Invalid response format from CORS proxy - not an array:', typeof deploys)
+        return []
+      }
+
+      // Filter out invalid deploy objects
+      const validDeploys = deploys.filter(
+        (deployItem) =>
+          deployItem && typeof deployItem === 'object' && deployItem.id && deployItem.createdAt
+      )
+
+      // console.log(`Found ${validDeploys.length} valid deploys out of ${deploys.length} total`)
+
+      return validDeploys.slice(0, 10).map((deployItem) => {
+        // Safely parse dates to avoid "Invalid Date" errors
+        const createdAt = deployItem.createdAt ? new Date(deployItem.createdAt) : null
+        const publishedAt = deployItem.publishedAt ? new Date(deployItem.publishedAt) : null
+
+        let buildTime: number | undefined
+        if (
+          createdAt &&
+          publishedAt &&
+          !isNaN(createdAt.getTime()) &&
+          !isNaN(publishedAt.getTime())
+        ) {
+          buildTime = publishedAt.getTime() - createdAt.getTime()
+        }
+
+        return {
+          ...deployItem,
+          buildTime,
+        }
+      })
+    }),
     catchError((error) => {
       console.warn(`CORS proxy ${proxyIndex + 1} failed:`, error.message)
       return tryCorsProxy(netlifyUrl, accessToken, proxyIndex + 1)
@@ -100,14 +131,26 @@ export function fetchDeployHistory(
       headers,
     }).pipe(
       map((deploys) =>
-        deploys.slice(0, maxDeploys).map((deployItem) => ({
-          ...deployItem,
-          buildTime:
-            deployItem.publishedAt && deployItem.createdAt
-              ? new Date(deployItem.publishedAt).getTime() -
-                new Date(deployItem.createdAt).getTime()
-              : undefined,
-        }))
+        deploys.slice(0, maxDeploys).map((deployItem) => {
+          // Safely parse dates to avoid "Invalid Date" errors
+          const createdAt = deployItem.createdAt ? new Date(deployItem.createdAt) : null
+          const publishedAt = deployItem.publishedAt ? new Date(deployItem.publishedAt) : null
+
+          let buildTime: number | undefined
+          if (
+            createdAt &&
+            publishedAt &&
+            !isNaN(createdAt.getTime()) &&
+            !isNaN(publishedAt.getTime())
+          ) {
+            buildTime = publishedAt.getTime() - createdAt.getTime()
+          }
+
+          return {
+            ...deployItem,
+            buildTime,
+          }
+        })
       )
     )
   }

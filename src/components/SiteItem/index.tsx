@@ -21,7 +21,7 @@ const getImageUrl = (siteId: string, branchName?: string) => {
   return branchName ? `${baseUrl}?${time}&${branch}` : `${baseUrl}?${time}`
 }
 
-const useBadgeImage = (siteId: string, branchName?: string ) => {
+const useBadgeImage = (siteId: string, branchName?: string) => {
   const [src, setSrc] = useState(() => getImageUrl(siteId, branchName))
   const update = useCallback(() => setSrc(getImageUrl(siteId, branchName)), [siteId])
 
@@ -77,11 +77,15 @@ const SiteItem: FunctionComponent<Props> = (props) => {
                 {!hasBadgeError && <img src={badge} onError={handleBadgeError} alt="Badge" />}
                 {hasBadgeError && (
                   <Card tone="critical" radius={2} padding={2}>
-                    <Label size={0} muted>Failed to load badge</Label>
+                    <Label size={0} muted>
+                      Failed to load badge
+                    </Label>
                   </Card>
                 )}
                 {isRefreshing && (
-                  <Text size={0} muted>Refreshing...</Text>
+                  <Text size={0} muted>
+                    Refreshing...
+                  </Text>
                 )}
               </Flex>
             </Stack>
@@ -97,23 +101,26 @@ const SiteItem: FunctionComponent<Props> = (props) => {
         {hasDeployHistory && (
           <Box>
             <Flex justify="space-between" align="center">
-              <Text size={1} weight="semibold">Deploy History</Text>
-              <Button 
-                mode="bleed" 
-                onClick={toggleDeployHistory} 
-                text={showDeployHistory ? "Hide" : "Show"}
+              <Text size={1} weight="semibold">
+                Deploy History
+              </Text>
+              <Button
+                mode="bleed"
+                onClick={toggleDeployHistory}
+                text={showDeployHistory ? 'Hide' : 'Show'}
                 size={0}
               />
             </Flex>
-            
+
             {latestDeploy && (
               <Box marginTop={2}>
                 <Text size={0} muted>
-                  Latest: {latestDeploy.status} • {new Date(latestDeploy.createdAt).toLocaleDateString()}
+                  Latest: {latestDeploy.status} •{' '}
+                  {new Date(latestDeploy.createdAt).toLocaleDateString()}
                 </Text>
               </Box>
             )}
-            
+
             {showDeployHistory && (
               <Box marginTop={3}>
                 <DeployList deploys={deployHistory} isLoading={isRefreshing} />

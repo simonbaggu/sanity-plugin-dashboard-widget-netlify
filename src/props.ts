@@ -19,10 +19,10 @@ const INITIAL_PROPS = {
 // Helper function to create deploy history stream for a site
 const createDeployHistoryStream = (
   site: Site,
+  actionType: string,
   accessToken?: string,
   proxyUrl?: string,
-  maxDeploys: number = 10,
-  actionType: string
+  maxDeploys: number = 10
 ) => {
   return fetchDeployHistory(site.id, accessToken, proxyUrl, maxDeploys).pipe(
     map((deploys) => ({type: actionType, siteId: site.id, deploys})),
@@ -33,14 +33,14 @@ const createDeployHistoryStream = (
 // Helper function to create deploy history streams for all sites
 const createDeployHistoryStreams = (
   sites: Site[],
+  actionType: string,
   accessToken?: string,
   proxyUrl?: string,
-  maxDeploys: number = 10,
-  actionType: string
+  maxDeploys: number = 10
 ) => {
   return merge(
     ...sites.map((site) =>
-      createDeployHistoryStream(site, accessToken, proxyUrl, maxDeploys, actionType)
+      createDeployHistoryStream(site, actionType, accessToken, proxyUrl, maxDeploys)
     )
   )
 }
@@ -86,10 +86,10 @@ export const props$ = (options: WidgetOptions) => {
         switchMap((sites) =>
           createDeployHistoryStreams(
             sites,
+            'deployHistory/updated',
             accessToken,
             proxyUrl,
-            maxDeploys,
-            'deployHistory/updated'
+            maxDeploys
           )
         )
       )
@@ -103,10 +103,10 @@ export const props$ = (options: WidgetOptions) => {
         switchMap((sites) =>
           createDeployHistoryStreams(
             sites,
+            'deployHistory/fastUpdated',
             accessToken,
             proxyUrl,
-            maxDeploys,
-            'deployHistory/fastUpdated'
+            maxDeploys
           )
         )
       )

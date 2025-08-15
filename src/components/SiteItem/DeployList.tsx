@@ -9,18 +9,20 @@ interface Props {
 
 const formatBuildTime = (buildTime?: number): string => {
   if (!buildTime) return 'Unknown'
-  
+
   const seconds = Math.floor(buildTime / 1000)
   const minutes = Math.floor(seconds / 60)
   const remainingSeconds = seconds % 60
-  
+
   if (minutes > 0) {
     return `${minutes}m ${remainingSeconds}s`
   }
   return `${seconds}s`
 }
 
-const getStatusColor = (status: Deploy['status']): 'primary' | 'positive' | 'critical' | 'caution' => {
+const getStatusColor = (
+  status: Deploy['status']
+): 'primary' | 'positive' | 'critical' | 'caution' => {
   switch (status) {
     case 'ready':
       return 'positive'
@@ -39,16 +41,16 @@ const formatDate = (dateString: string): string => {
   const date = new Date(dateString)
   const now = new Date()
   const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60))
-  
+
   if (diffInMinutes < 1) return 'Just now'
   if (diffInMinutes < 60) return `${diffInMinutes}m ago`
-  
+
   const diffInHours = Math.floor(diffInMinutes / 60)
   if (diffInHours < 24) return `${diffInHours}h ago`
-  
+
   const diffInDays = Math.floor(diffInHours / 24)
   if (diffInDays < 7) return `${diffInDays}d ago`
-  
+
   return date.toLocaleDateString()
 }
 
@@ -56,7 +58,9 @@ const DeployList: FunctionComponent<Props> = ({deploys, isLoading}) => {
   if (isLoading) {
     return (
       <Box padding={3}>
-        <Text size={1} muted>Loading deploy history...</Text>
+        <Text size={1} muted>
+          Loading deploy history...
+        </Text>
       </Box>
     )
   }
@@ -64,7 +68,9 @@ const DeployList: FunctionComponent<Props> = ({deploys, isLoading}) => {
   if (!deploys || deploys.length === 0) {
     return (
       <Box padding={3}>
-        <Text size={1} muted>No deploy history available</Text>
+        <Text size={1} muted>
+          No deploy history available
+        </Text>
       </Box>
     )
   }
@@ -89,7 +95,7 @@ const DeployList: FunctionComponent<Props> = ({deploys, isLoading}) => {
                 {deploy.status}
               </Badge>
             </Flex>
-            
+
             <Flex justify="space-between" align="center">
               <Text size={0} muted>
                 {formatDate(deploy.createdAt)}
@@ -100,13 +106,13 @@ const DeployList: FunctionComponent<Props> = ({deploys, isLoading}) => {
                 </Text>
               )}
             </Flex>
-            
+
             {deploy.errorMessage && (
               <Card tone="critical" padding={2} radius={1}>
                 <Text size={0}>{deploy.errorMessage}</Text>
               </Card>
             )}
-            
+
             {deploy.deployUrl && (
               <Text size={0}>
                 <a href={deploy.deployUrl} target="_blank" rel="noopener noreferrer">

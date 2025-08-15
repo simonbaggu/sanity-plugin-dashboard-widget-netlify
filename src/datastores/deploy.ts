@@ -1,7 +1,15 @@
 import {Observable, of} from 'rxjs'
-import {map} from 'rxjs/operators'
+import {map, catchError} from 'rxjs/operators'
 import {statusCodeRequest} from '../http/statusCodeRequest'
+import {jsonRequest} from '../http/jsonRequest'
 import {Site, Deploy} from '../types'
+
+// List of reliable CORS proxy services
+const CORS_PROXIES = [
+  'https://corsproxy.io/?',
+  'https://api.allorigins.win/raw?url=',
+  'https://cors-anywhere.herokuapp.com/',
+]
 
 export function deploy(
   site: Site,
@@ -27,19 +35,83 @@ export function deploy(
   }).pipe(map((result) => ({result, site})))
 }
 
-export function fetchDeployHistory(
-  _siteId: string,
-  _accessToken?: string,
-  _proxyUrl?: string,
-  _maxDeploys: number = 10
+function tryCorsProxy(
+  netlifyUrl: string,
+  accessToken?: string,
+  proxyIndex: number = 0
 ): Observable<Deploy[]> {
-  // For now, we'll skip deploy history fetching due to CORS limitations
-  // Users can still trigger deploys, but deploy history won't be available
-  // until Netlify adds CORS support or we implement a server-side solution
+  if (proxyIndex >= CORS_PROXIES.length) {
+    console.warn('All CORS proxies failed. Deploy history unavailable.')
+    return of([])
+  }
 
-  console.warn(
-    'Deploy history fetching is disabled due to Netlify API CORS limitations. Only deploy triggering is available.'
+  const corsProxy = CORS_PROXIES[proxyIndex]
+  const url = `${corsProxy}${encodeURIComponent(netlifyUrl)}`
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`
+  }
+
+  return jsonRequest<Deploy[]>(url, {
+    method: 'GET',
+    headers,
+  }).pipe(
+    map((deploys) =>
+      deploys.slice(0, 10).map((deployItem) => ({
+        ...deployItem,
+        buildTime:
+          deployItem.publishedAt && deployItem.createdAt
+            ? new Date(deployItem.publishedAt).getTime() - new Date(deployItem.createdAt).getTime()
+            : undefined,
+      }))
+    ),
+    catchError((error) => {
+      console.warn(`CORS proxy ${proxyIndex + 1} failed:`, error.message)
+      return tryCorsProxy(netlifyUrl, accessToken, proxyIndex + 1)
+    })
   )
+}
 
-  return of([])
+export function fetchDeployHistory(
+  siteId: string,
+  accessToken?: string,
+  proxyUrl?: string,
+  maxDeploys: number = 10
+): Observable<Deploy[]> {
+  const netlifyUrl = `https://api.netlify.com/api/v1/sites/${siteId}/deploys`
+
+  // If custom proxy is provided, use it
+  if (proxyUrl) {
+    const url = `${proxyUrl}/sites/${siteId}/deploys`
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    }
+
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`
+    }
+
+    return jsonRequest<Deploy[]>(url, {
+      method: 'GET',
+      headers,
+    }).pipe(
+      map((deploys) =>
+        deploys.slice(0, maxDeploys).map((deployItem) => ({
+          ...deployItem,
+          buildTime:
+            deployItem.publishedAt && deployItem.createdAt
+              ? new Date(deployItem.publishedAt).getTime() -
+                new Date(deployItem.createdAt).getTime()
+              : undefined,
+        }))
+      )
+    )
+  }
+
+  // Otherwise, try the built-in CORS proxies
+  return tryCorsProxy(netlifyUrl, accessToken)
 }

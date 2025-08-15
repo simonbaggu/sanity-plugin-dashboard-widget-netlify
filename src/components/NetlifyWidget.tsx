@@ -11,7 +11,15 @@ const ContentCard = styled(Card)`
 
 export default function NetlifyWidget(props: NetlifyWidgetProps) {
   const netlifySitesUrl = 'https://app.netlify.com/account/sites'
-  const {title, description, isLoading, sites, onDeploy} = props
+  const {
+    title,
+    description,
+    isLoading,
+    sites,
+    onDeploy,
+    deployHistory = {},
+    isRefreshing = false,
+  } = props
 
   const footer = (
     <Flex direction="column" align="stretch">
@@ -40,7 +48,13 @@ export default function NetlifyWidget(props: NetlifyWidgetProps) {
             </Text>
           </Box>
         )}
-        <SiteList isLoading={isLoading} onDeploy={onDeploy} sites={sites} />
+        <SiteList
+          isLoading={isLoading}
+          onDeploy={onDeploy}
+          sites={sites}
+          deployHistory={deployHistory}
+          isRefreshing={isRefreshing}
+        />
       </ContentCard>
     </DashboardWidgetContainer>
   )

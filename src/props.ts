@@ -1,7 +1,7 @@
-import {merge, of} from 'rxjs'
+import {merge, of, timer} from 'rxjs'
 import {createEventHandler} from 'react-props-stream'
 import {catchError, map, startWith, switchMap} from 'rxjs/operators'
-import {deploy} from './datastores/deploy'
+import {deploy, fetchDeployHistory} from './datastores/deploy'
 import {Site, WidgetOptions} from './types'
 import {stateReducer$} from './reducers'
 
@@ -12,10 +12,49 @@ const INITIAL_PROPS = {
   sites: [],
   isLoading: true,
   onDeploy: noop,
+  deployHistory: {},
+  isRefreshing: false,
+}
+
+// Helper function to create deploy history stream for a site
+const createDeployHistoryStream = (
+  site: Site,
+  accessToken?: string,
+  proxyUrl?: string,
+  maxDeploys: number = 10,
+  actionType: string
+) => {
+  return fetchDeployHistory(site.id, accessToken, proxyUrl, maxDeploys).pipe(
+    map((deploys) => ({type: actionType, siteId: site.id, deploys})),
+    catchError(() => of({type: 'deployHistory/failed', siteId: site.id}))
+  )
+}
+
+// Helper function to create deploy history streams for all sites
+const createDeployHistoryStreams = (
+  sites: Site[],
+  accessToken?: string,
+  proxyUrl?: string,
+  maxDeploys: number = 10,
+  actionType: string
+) => {
+  return merge(
+    ...sites.map((site) =>
+      createDeployHistoryStream(site, accessToken, proxyUrl, maxDeploys, actionType)
+    )
+  )
 }
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export const props$ = (options: WidgetOptions) => {
+  const {
+    accessToken,
+    proxyUrl,
+    maxDeploys = 10,
+    pollIntervalMs = 30000,
+    fastPollIntervalMs = 5000,
+  } = options
+
   const configuredSites = (options.sites || []).map((site) => ({
     id: site.apiId,
     name: site.name,
@@ -32,7 +71,7 @@ export const props$ = (options: WidgetOptions) => {
   const [onDeploy$, onDeploy] = createEventHandler<Site>()
   const setSitesAction$ = of(configuredSites).pipe(map((sites) => ({type: 'setSites', sites})))
   const deployAction$ = onDeploy$.pipe(map((site) => ({type: 'deploy/started', site})))
-  const deployResult$ = onDeploy$.pipe(switchMap((site) => deploy(site)))
+  const deployResult$ = onDeploy$.pipe(switchMap((site) => deploy(site, accessToken, proxyUrl)))
   const deployCompletedAction$ = deployResult$.pipe(
     map(
       (result) => ({type: 'deploy/completed', ...result}),
@@ -40,15 +79,57 @@ export const props$ = (options: WidgetOptions) => {
     )
   )
 
-  merge(setSitesAction$, deployAction$, deployCompletedAction$).pipe(stateReducer$).subscribe()
+  // Auto-refresh functionality
+  const refreshDeployHistory$ = timer(0, pollIntervalMs).pipe(
+    switchMap(() =>
+      of(configuredSites).pipe(
+        switchMap((sites) =>
+          createDeployHistoryStreams(
+            sites,
+            accessToken,
+            proxyUrl,
+            maxDeploys,
+            'deployHistory/updated'
+          )
+        )
+      )
+    )
+  )
 
-  return of(configuredSites).pipe(
-    map((sites) => ({
-      sites,
+  // Fast refresh when deploy is in progress
+  const fastRefresh$ = timer(0, fastPollIntervalMs).pipe(
+    switchMap(() =>
+      of(configuredSites).pipe(
+        switchMap((sites) =>
+          createDeployHistoryStreams(
+            sites,
+            accessToken,
+            proxyUrl,
+            maxDeploys,
+            'deployHistory/fastUpdated'
+          )
+        )
+      )
+    )
+  )
+
+  const state$ = merge(
+    setSitesAction$,
+    deployAction$,
+    deployCompletedAction$,
+    refreshDeployHistory$,
+    fastRefresh$
+  ).pipe(stateReducer$)
+
+  return state$.pipe(
+    map((state) => ({
+      sites: state.sites,
       title: options.title || INITIAL_PROPS.title,
       description: options.description,
       isLoading: false,
       onDeploy,
+      deployHistory: state.deployHistory,
+      isRefreshing: state.isRefreshing,
     })),
     startWith(INITIAL_PROPS)
   )

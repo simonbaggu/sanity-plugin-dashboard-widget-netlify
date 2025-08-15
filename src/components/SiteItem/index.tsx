@@ -1,11 +1,14 @@
 import React, {FunctionComponent, useCallback, useEffect, useRef, useState} from 'react'
 import {Button, Flex, Box, Card, Text, Stack, Label} from '@sanity/ui'
-import {DeployAction, Site} from '../../types'
+import {DeployAction, Site, Deploy} from '../../types'
 import Links from './Links'
+import DeployList from './DeployList'
 
 interface Props {
   site: Site
   onDeploy: DeployAction
+  deployHistory?: Deploy[]
+  isRefreshing?: boolean
 }
 
 export const IMAGE_PULL_INTERVAL = 10000
@@ -42,7 +45,8 @@ const useDeploy = (site: Site, onDeploy: DeployAction, updateBadge: () => void) 
 
 const SiteItem: FunctionComponent<Props> = (props) => {
   const [hasBadgeError, setHasBadgeError] = useState(false)
-  const {site, onDeploy} = props
+  const [showDeployHistory, setShowDeployHistory] = useState(false)
+  const {site, onDeploy, deployHistory = [], isRefreshing = false} = props
   const {id, name, title, url, adminUrl, buildHookId, branch} = site
 
   const [badge, updateBadge] = useBadgeImage(id, branch)
@@ -51,28 +55,74 @@ const SiteItem: FunctionComponent<Props> = (props) => {
     setHasBadgeError(true)
   }
 
+  const toggleDeployHistory = () => {
+    setShowDeployHistory(!showDeployHistory)
+  }
+
+  const hasDeployHistory = deployHistory && deployHistory.length > 0
+  const latestDeploy = deployHistory[0]
+
   return (
-    <Flex as="li">
-      <Box flex={1} paddingY={2} paddingX={3}>
-        <Stack space={2}>
-          <Text as="h4">
-            {title || name}
-            <Links url={url} adminUrl={adminUrl} />
-          </Text>
+    <Card as="li" padding={3} radius={2} tone="default">
+      <Stack space={3}>
+        <Flex justify="space-between" align="flex-start">
+          <Box flex={1}>
+            <Stack space={2}>
+              <Text as="h4">
+                {title || name}
+                <Links url={url} adminUrl={adminUrl} />
+              </Text>
 
-          <Flex justify="flex-start">
-            {!hasBadgeError && <img src={badge} onError={handleBadgeError} alt="Badge" />}
-            {hasBadgeError && <Card tone="critical" radius={2} padding={2}><Label size={0} muted>Failed to load badge</Label></Card>}
-          </Flex>
-        </Stack>
-      </Box>
+              <Flex justify="flex-start" align="center" gap={2}>
+                {!hasBadgeError && <img src={badge} onError={handleBadgeError} alt="Badge" />}
+                {hasBadgeError && (
+                  <Card tone="critical" radius={2} padding={2}>
+                    <Label size={0} muted>Failed to load badge</Label>
+                  </Card>
+                )}
+                {isRefreshing && (
+                  <Text size={0} muted>Refreshing...</Text>
+                )}
+              </Flex>
+            </Stack>
+          </Box>
 
-      {buildHookId ? (
-        <Box paddingY={2} paddingX={3}>
-          <Button mode="ghost" onClick={handleDeploy} text="Deploy" />
-        </Box>
-      ) : null}
-    </Flex>
+          {buildHookId && (
+            <Box>
+              <Button mode="ghost" onClick={handleDeploy} text="Deploy" />
+            </Box>
+          )}
+        </Flex>
+
+        {hasDeployHistory && (
+          <Box>
+            <Flex justify="space-between" align="center">
+              <Text size={1} weight="semibold">Deploy History</Text>
+              <Button 
+                mode="bleed" 
+                onClick={toggleDeployHistory} 
+                text={showDeployHistory ? "Hide" : "Show"}
+                size={0}
+              />
+            </Flex>
+            
+            {latestDeploy && (
+              <Box marginTop={2}>
+                <Text size={0} muted>
+                  Latest: {latestDeploy.status} • {new Date(latestDeploy.createdAt).toLocaleDateString()}
+                </Text>
+              </Box>
+            )}
+            
+            {showDeployHistory && (
+              <Box marginTop={3}>
+                <DeployList deploys={deployHistory} isLoading={isRefreshing} />
+              </Box>
+            )}
+          </Box>
+        )}
+      </Stack>
+    </Card>
   )
 }
 

@@ -1,5 +1,5 @@
 import {scan} from 'rxjs/operators'
-import {Site} from './types'
+import {Site, Deploy} from './types'
 
 interface Deployment {
   id: string
@@ -11,17 +11,29 @@ interface Action {
   site?: Site
   error?: Error
   deployments?: Deployment[]
+  siteId?: string
+  deploys?: Deploy[]
 }
 
 interface State {
   sites: Site[]
+  deployHistory: Record<string, Deploy[]>
+  isRefreshing: boolean
   action: Action
 }
 
-export const stateReducer$ = scan((state: State, action: Action) => {
+const initialState: State = {
+  sites: [],
+  deployHistory: {},
+  isRefreshing: false,
+  action: {type: 'init'},
+}
+
+export const stateReducer$ = scan((state: State = initialState, action: Action): State => {
   switch (action.type) {
     case 'setSites':
       return {...state, sites: action.sites || []}
+
     case 'deploy/started':
       return {
         ...state,
@@ -32,11 +44,13 @@ export const stateReducer$ = scan((state: State, action: Action) => {
           return site
         }),
       }
+
     case 'deploy/failed':
       return {
         ...state,
-        error: action.error,
+        action,
       }
+
     case 'deploy/completed':
       return {
         ...state,
@@ -47,6 +61,33 @@ export const stateReducer$ = scan((state: State, action: Action) => {
           return site
         }),
       }
+
+    case 'deployHistory/updated':
+      return {
+        ...state,
+        deployHistory: {
+          ...state.deployHistory,
+          [action.siteId!]: action.deploys || [],
+        },
+        isRefreshing: false,
+      }
+
+    case 'deployHistory/fastUpdated':
+      return {
+        ...state,
+        deployHistory: {
+          ...state.deployHistory,
+          [action.siteId!]: action.deploys || [],
+        },
+        isRefreshing: true,
+      }
+
+    case 'deployHistory/failed':
+      return {
+        ...state,
+        isRefreshing: false,
+      }
+
     default:
       return state
   }

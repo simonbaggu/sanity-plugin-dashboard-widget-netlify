@@ -1,7 +1,6 @@
 import {Observable, of} from 'rxjs'
 import {map} from 'rxjs/operators'
 import {statusCodeRequest} from '../http/statusCodeRequest'
-import {jsonRequest} from '../http/jsonRequest'
 import {Site, Deploy} from '../types'
 
 export function deploy(
@@ -29,34 +28,18 @@ export function deploy(
 }
 
 export function fetchDeployHistory(
-  siteId: string,
-  accessToken?: string,
-  proxyUrl?: string,
-  maxDeploys: number = 10
+  _siteId: string,
+  _accessToken?: string,
+  _proxyUrl?: string,
+  _maxDeploys: number = 10
 ): Observable<Deploy[]> {
-  // Use a proxy URL that points to a Sanity API route
-  const baseUrl = proxyUrl || '/api/netlify'
-  const url = `${baseUrl}/sites/${siteId}/deploys`
+  // For now, we'll skip deploy history fetching due to CORS limitations
+  // Users can still trigger deploys, but deploy history won't be available
+  // until Netlify adds CORS support or we implement a server-side solution
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (accessToken) {
-    headers.Authorization = `Bearer ${accessToken}`
-  }
-
-  return jsonRequest<Deploy[]>(url, {
-    method: 'GET',
-    headers,
-  }).pipe(
-    map((deploys) =>
-      deploys.slice(0, maxDeploys).map((deployItem) => ({
-        ...deployItem,
-        buildTime:
-          deployItem.publishedAt && deployItem.createdAt
-            ? new Date(deployItem.publishedAt).getTime() - new Date(deployItem.createdAt).getTime()
-            : undefined,
-      }))
-    )
+  console.warn(
+    'Deploy history fetching is disabled due to Netlify API CORS limitations. Only deploy triggering is available.'
   )
+
+  return of([])
 }

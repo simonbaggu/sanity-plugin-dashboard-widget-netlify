@@ -34,9 +34,9 @@ export function fetchDeployHistory(
   proxyUrl?: string,
   maxDeploys: number = 10
 ): Observable<Deploy[]> {
-  const url = proxyUrl
-    ? `${proxyUrl}/sites/${siteId}/deploys`
-    : `https://api.netlify.com/api/v1/sites/${siteId}/deploys`
+  // Use a proxy URL that points to a Sanity API route
+  const baseUrl = proxyUrl || '/api/netlify'
+  const url = `${baseUrl}/sites/${siteId}/deploys`
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

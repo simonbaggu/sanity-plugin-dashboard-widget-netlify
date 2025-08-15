@@ -57,5 +57,5 @@ yalc.lock
 *.tgz
 
 # Compiled plugin
-lib
+# lib - Removed to allow built files to be committed for GitHub installation
 
